@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CYBERPONG // 2077</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --neon-cyan: #00f3ff;
+      --neon-pink: #ff007f;
+      --neon-yellow: #fcee09;
+      --neon-green: #00ff66;
+      --bg-dark: #060712;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-dark);
+      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(0, 243, 255, 0.08) 0%, rgba(255, 0, 127, 0.05) 45%, rgba(6, 7, 18, 1) 100%);
+    }
+
+    .font-cyber {
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    /* CRT Scanline Overlay */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.25) 50%
+      ), linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.03),
+        rgba(0, 255, 0, 0.01),
+        rgba(0, 0, 255, 0.03)
+      );
+      background-size: 100% 4px, 6px 100%;
+    }
+
+    .neon-border {
+      box-shadow: 
+        0 0 15px rgba(0, 243, 255, 0.35),
+        inset 0 0 15px rgba(255, 0, 127, 0.25);
+      border: 1px solid rgba(0, 243, 255, 0.4);
+    }
+
+    .text-glow-cyan {
+      text-shadow: 0 0 10px var(--neon-cyan), 0 0 25px var(--neon-cyan);
+    }
+
+    .text-glow-pink {
+      text-shadow: 0 0 10px var(--neon-pink), 0 0 25px var(--neon-pink);
+    }
+
+    .text-glow-yellow {
+      text-shadow: 0 0 10px var(--neon-yellow), 0 0 25px var(--neon-yellow);
+    }
+
+    .cyber-btn {
+      position: relative;
+      background: rgba(15, 20, 40, 0.85);
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      overflow: hidden;
+    }
+
+    .cyber-btn:hover, .cyber-btn.active {
+      background: var(--neon-cyan);
+      color: #05060f;
+      box-shadow: 0 0 20px var(--neon-cyan);
+      font-weight: 700;
+    }
+
+    .cyber-btn-pink {
+      border-color: var(--neon-pink);
+      color: var(--neon-pink);
+    }
+
+    .cyber-btn-pink:hover, .cyber-btn-pink.active {
+      background: var(--neon-pink);
+      color: #05060f;
+      box-shadow: 0 0 20px var(--neon-pink);
+      font-weight: 700;
+    }
+
+    canvas {
+      display: block;
+      touch-action: none;
+      cursor: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div>
+
+  <!-- Top HUD -->
+  <div class="w-full max-w-6xl px-4 mb-2 flex items-center justify-between z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-8 bg-cyan-400 shadow-[0_0_12px_#00f3ff]"></div>
+      <div>
+        <div class="text-xs uppercase tracking-widest text-cyan-300/70">Player 01 // Cyan</div>
+        <div class="text-sm font-bold text-cyan-400 flex items-center gap-2">
+          <span id="p1ControlHint">MOUSE / W-S</span>
+          <span id="p1PowerBadge" class="hidden px-2 py-0.5 text-[10px] rounded bg-cyan-500/20 border border-cyan-400 text-cyan-200 animate-pulse">MEGA PADDLE</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col items-center">
+      <h1 class="font-cyber text-xl md:text-2xl font-black tracking-widest italic bg-gradient-to-r from-cyan-400 via-yellow-300 to-pink-500 bg-clip-text text-transparent">
+        CYBERPONG // 2077
+      </h1>
+      <div class="flex items-center gap-4 text-xs text-slate-400 tracking-wider">
+        <span>FIRST TO <strong id="winTargetLabel" class="text-yellow-300">7</strong></span>
+        <span>•</span>
+        <span>RALLY: <strong id="rallyCounter" class="text-white">0</strong></span>
+        <span>•</span>
+        <span>MAX SPEED: <strong id="speedCounter" class="text-cyan-300">100%</strong></span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="text-right">
+        <div id="p2NameLabel" class="text-xs uppercase tracking-widest text-pink-300/70">AI Core // Nexus</div>
+        <div class="text-sm font-bold text-pink-400 flex items-center justify-end gap-2">
+          <span id="p2PowerBadge" class="hidden px-2 py-0.5 text-[10px] rounded bg-pink-500/20 border border-pink-400 text-pink-200 animate-pulse">MEGA PADDLE</span>
+          <span id="p2ControlHint">AUTO-PILOT</span>
+        </div>
+      </div>
+      <div class="w-3 h-8 bg-pink-500 shadow-[0_0_12px_#ff007f]"></div>
+    </div>
+  </div>
+
+  <!-- Main Arena Container -->
+  <div id="arenaContainer" class="relative w-[96vw] max-w-6xl aspect-[16/10] max-h-[80vh] rounded-xl neon-border bg-[#070918]/90 overflow-hidden z-10">
+    <canvas id="gameCanvas" class="w-full h-full"></canvas>
+
+    <!-- Floating Quick Controls (Top Center Inside Canvas) -->
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30">
+      <button id="pauseBtn" class="px-3 py-1 rounded text-xs font-cyber bg-slate-900/80 border border-slate-700 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 transition">
+        PAUSE [P]
+      </button>
+      <button id="soundBtn" class="px-3 py-1 rounded text-xs font-cyber bg-slate-900/80 border border-slate-700 hover:border-yellow-400 text-slate-300 hover:text-yellow-300 transition">
+        SFX: ON [M]
+      </button>
+      <button id="menuBtn" class="px-3 py-1 rounded text-xs font-cyber bg-slate-900/80 border border-slate-700 hover:border-pink-400 text-slate-300 hover:text-pink-300 transition">
+        MENU [ESC]
+      </button>
+    </div>
+
+    <!-- Start / Pause / Game Over Overlay Modal -->
+    <div id="overlayModal" class="absolute inset-0 bg-[#050611]/85 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30 transition-opacity duration-300">
+      <div class="max-w-lg w-full bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-6 md:p-8 shadow-[0_0_50px_rgba(0,243,255,0.2)] text-center relative overflow-hidden">
+        <!-- Decorative Corner Accents -->
+        <div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400"></div>
+        <div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-pink-500"></div>
+        <div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-pink-500"></div>
+        <div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400"></div>
+
+        <p id="modalSubtitle" class="text-xs font-cyber tracking-[0.3em] text-yellow-300 uppercase mb-1">HYPER-ARCADE EDITION</p>
+        <h2 id="modalTitle" class="font-cyber text-3xl md:text-5xl font-black tracking-wider mb-6 text-glow-cyan text-white">
+          CYBERPONG
+        </h2>
+
+        <!-- Winner Banner (Hidden by default) -->
+        <div id="winnerBanner" class="hidden mb-6 py-3 px-4 rounded-lg bg-gradient-to-r from-cyan-500/20 via-yellow-400/20 to-pink-500/20 border border-yellow-400/40">
+          <div id="winnerText" class="font-cyber text-xl font-bold text-yellow-300 text-glow-yellow">PLAYER 1 WINS!</div>
+          <div id="finalScoreText" class="text-sm text-slate-300 mt-1">7 - 4</div>
+        </div>
+
+        <!-- Mode Selection -->
+        <div class="space-y-4 text-left mb-6">
+          <div>
+            <label class="block text-xs font-cyber uppercase tracking-wider text-slate-400 mb-2">Game Mode</label>
+            <div class="grid grid-cols-2 gap-3">
+              <button data-mode="ai" class="mode-btn cyber-btn active py-2.5 rounded-lg font-cyber text-xs">
+                1P VS AI CORE
+              </button>
+              <button data-mode="2p" class="mode-btn cyber-btn cyber-btn-pink py-2.5 rounded-lg font-cyber text-xs">
+                2P LOCAL VERSUS
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Difficulty Row -->
+          <div id="difficultySection">
+            <label class="block text-xs font-cyber uppercase tracking-wider text-slate-400 mb-2">AI Neural Difficulty</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-diff="easy" class="diff-btn cyber-btn py-2 rounded-lg font-cyber text-xs">CHILL</button>
+              <button data-diff="medium" class="diff-btn cyber-btn active py-2 rounded-lg font-cyber text-xs">PRO</button>
+              <button data-diff="hard" class="diff-btn cyber-btn py-2 rounded-lg font-cyber text-xs">INSANE</button>
+            </div>
+          </div>
+
+          <!-- Powerups Toggle -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+            <div>
+              <div class="text-xs font-cyber uppercase tracking-wider text-slate-300">Cyber Power-Ups</div>
+              <div class="text-[11px] text-slate-400">Multi-Ball (M), Mega Paddle (G), Speed Overdrive (S)</div>
+            </div>
+            <button id="powerupToggleBtn" class="px-4 py-1.5 rounded-lg font-cyber text-xs border border-emerald-400 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+              ON
+            </button>
+          </div>
+        </div>
+
+        <!-- Primary Action Button -->
+        <button id="startBtn" class="w-full py-3.5 rounded-xl font-cyber text-base font-black tracking-widest bg-gradient-to-r from-cyan-400 via-cyan-300 to-pink-500 text-slate-950 shadow-[0_0_25px_rgba(0,243,255,0.6)] hover:scale-[1.02] active:scale-[0.99] transition">
+          LAUNCH MATCH [SPACE]
+        </button>
+
+        <!-- Controls Footer -->
+        <div class="mt-5 pt-4 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-[11px] text-slate-400">
+          <div>
+            <span class="text-cyan-400 font-bold block">PLAYER 1</span>
+            Mouse / Touch / W & S
+          </div>
+          <div>
+            <span class="text-yellow-300 font-bold block">GOAL AREA</span>
+            Center 40% + Serve Shield
+          </div>
+          <div>
+            <span class="text-pink-400 font-bold block">PLAYER 2</span>
+            Up & Down Arrows / Touch
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // WEB AUDIO SYNTHESIZER (Zero External Assets)
+    // ==========================================
+    class CyberAudio {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playPaddleHit(speedRatio = 1) {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        const baseFreq = 260 + Math.min(speedRatio * 180, 400);
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, now + 0.09);
+
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      }
+
+      playWallHit() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(170, now);
+        osc.frequency.exponentialRampToValueAtTime(95, now + 0.07);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      }
+
+      playPowerup() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [440, 554.37, 659.25, 880];
+        notes.forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now + i * 0.045);
+          gain.gain.setValueAtTime(0.12, now + i * 0.045);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.12);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.045);
+          osc.stop(now + i * 0.045 + 0.12);
+        });
+      }
+
+      playScore(isPlayer1) {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const freqs = isPlayer1 ? [523.25, 659.25, 783.99, 1046.5] : [392.0, 349.23, 311.13, 261.63];
+        freqs.forEach((f, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(f, now + idx * 0.06);
+          gain.gain.setValueAtTime(0.14, now + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.18);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.06);
+          osc.stop(now + idx * 0.06 + 0.18);
+        });
+      }
+
+      playCountdownTick(isFinalGo = false) {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = isFinalGo ? 'sawtooth' : 'sine';
+        const freq = isFinalGo ? 880 : 440;
+        osc.frequency.setValueAtTime(freq, now);
+        if (isFinalGo) {
+          osc.frequency.exponentialRampToValueAtTime(1320, now + 0.18);
+        }
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (isFinalGo ? 0.2 : 0.11));
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + (isFinalGo ? 0.2 : 0.11));
+      }
+    }
+
+    const audio = new CyberAudio();
+
+    // ==========================================
+    // GAME CONSTANTS & STATE
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const VIRTUAL_W = 1200;
+    const VIRTUAL_H = 750;
+    canvas.width = VIRTUAL_W;
+    canvas.height = VIRTUAL_H;
+
+    // Center 40% Goal Configuration
+    const GOAL_RATIO = 0.40;
+    const GOAL_HEIGHT = VIRTUAL_H * GOAL_RATIO; // 300px
+    const GOAL_TOP = (VIRTUAL_H - GOAL_HEIGHT) / 2; // 225px
+    const GOAL_BOTTOM = GOAL_TOP + GOAL_HEIGHT; // 525px
+    const GOAL_POST_RADIUS = 10;
+
+    const WIN_SCORE = 7;
+    const PADDLE_WIDTH = 16;
+    const BASE_PADDLE_HEIGHT = 115;
+    const SERVE_SHIELD_HEIGHT = GOAL_HEIGHT + 16; // Covers the entire 40% goal mouth + post edges
+    const PADDLE_MARGIN = 38;
+    const BALL_RADIUS = 10;
+
+    const DIFFICULTY_PRESETS = {
+      easy:   { speed: 3.6, reactionError: 95, accel: 0.11, reactX: VIRTUAL_W * 0.48 },
+      medium: { speed: 8.6, reactionError: 24, accel: 0.28, reactX: VIRTUAL_W * 0.22 },
+      hard:   { speed: 12.8, reactionError: 4, accel: 0.48, reactX: 0 }
+    };
+
+    let state = {
+      running: false,
+      paused: false,
+      gameOver: false,
+      mode: 'ai',          // 'ai' or '2p'
+      difficulty: 'medium',
+      powerupsEnabled: true,
+      rally: 0,
+      maxSpeedPct: 100,
+      shakeTime: 0,
+      shakeMagnitude: 0,
+      goalFlash: 0,
+      goalFlashColor: '#00f3ff',
+      powerupSpawnTimer: 360,
+      roundCountdownFrames: 0,
+      roundCountdownNumber: 0,
+      nextServeDir: 1
+    };
+
+    const keys = {};
+
+    const p1 = {
+      x: PADDLE_MARGIN,
+      y: VIRTUAL_H / 2 - BASE_PADDLE_HEIGHT / 2,
+      w: PADDLE_WIDTH,
+      h: BASE_PADDLE_HEIGHT,
+      targetH: BASE_PADDLE_HEIGHT,
+      vy: 0,
+      score: 0,
+      color: '#00f3ff',
+      megaTimer: 0,
+      serveShield: false,
+      hitFlash: 0
+    };
+
+    const p2 = {
+      x: VIRTUAL_W - PADDLE_MARGIN - PADDLE_WIDTH,
+      y: VIRTUAL_H / 2 - BASE_PADDLE_HEIGHT / 2,
+      w: PADDLE_WIDTH,
+      h: BASE_PADDLE_HEIGHT,
+      targetH: BASE_PADDLE_HEIGHT,
+      vy: 0,
+      score: 0,
+      color: '#ff007f',
+      megaTimer: 0,
+      serveShield: false,
+      hitFlash: 0,
+      aiOffset: 0
+    };
+
+    let balls = [];
+    let particles = [];
+    let powerups = [];
+    let floatingTexts = [];
+
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+    function triggerShake(mag, duration = 12) {
+      state.shakeMagnitude = Math.max(state.shakeMagnitude, mag);
+      state.shakeTime = Math.max(state.shakeTime, duration);
+    }
+
+    function spawnParticles(x, y, color, count = 18, speedScale = 1) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (1.5 + Math.random() * 6.5) * speedScale;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1,
+          decay: 0.02 + Math.random() * 0.03,
+          size: 2 + Math.random() * 4,
+          color
+        });
+      }
+    }
+
+    function spawnFloatingText(x, y, text, color = '#fcee09') {
+      floatingTexts.push({
+        x,
+        y,
+        text,
+        color,
+        life: 1
+      });
+    }
+
+    // Releases the full-goal Serve Shield when the ball first touches a paddle or corner/wall
+    function releaseServeShield(reasonText = '') {
+      [p1, p2].forEach(p => {
+        if (p.serveShield) {
+          const centerY = p.y + p.h / 2;
+          p.serveShield = false;
+          p.targetH = p.megaTimer > 0 ? 185 : BASE_PADDLE_HEIGHT;
+          p.h = p.targetH;
+          p.y = Math.max(12, Math.min(VIRTUAL_H - 12 - p.h, centerY - p.h / 2));
+          p.hitFlash = 0.8;
+          spawnParticles(p.x + p.w / 2, centerY, p.color, 18, 1.1);
+          if (reasonText) {
+            spawnFloatingText(
+              p === p1 ? p.x + 95 : p.x - 95,
+              centerY,
+              reasonText,
+              '#fcee09'
+            );
+          }
+        }
+      });
+      updateHUD();
+    }
+
+    function createBall(direction = 1, customY = VIRTUAL_H / 2, speedMultiplier = 1) {
+      const angle = (Math.random() * 0.55 - 0.275); // radians
+      const baseSpeed = 9.2 * speedMultiplier;
+      return {
+        x: VIRTUAL_W / 2,
+        y: customY,
+        vx: Math.cos(angle) * baseSpeed * direction,
+        vy: Math.sin(angle) * baseSpeed,
+        speed: baseSpeed,
+        r: BALL_RADIUS,
+        color: direction > 0 ? '#ff007f' : '#00f3ff',
+        trail: [],
+        lastHitBy: direction > 0 ? 1 : 2,
+        spin: 0
+      };
+    }
+
+    function applyServeShieldForDirection(direction) {
+      // Activate full-goal shield on the defending paddle receiving the serve
+      const defendingPaddle = direction > 0 ? p2 : p1;
+      const otherPaddle = direction > 0 ? p1 : p2;
+
+      otherPaddle.serveShield = false;
+      otherPaddle.targetH = otherPaddle.megaTimer > 0 ? 185 : BASE_PADDLE_HEIGHT;
+      otherPaddle.h = otherPaddle.targetH;
+
+      defendingPaddle.serveShield = true;
+      defendingPaddle.targetH = SERVE_SHIELD_HEIGHT;
+      defendingPaddle.h = SERVE_SHIELD_HEIGHT;
+      defendingPaddle.y = GOAL_TOP - (SERVE_SHIELD_HEIGHT - GOAL_HEIGHT) / 2;
+      updateHUD();
+    }
+
+    function resetRound(direction = 1, withCountdown = false) {
+      state.rally = 0;
+      state.maxSpeedPct = 100;
+      state.nextServeDir = direction;
+      applyServeShieldForDirection(direction);
+      updateHUD();
+
+      if (withCountdown) {
+        balls = [];
+        state.roundCountdownFrames = 180; // 3 seconds @ 60fps
+        state.roundCountdownNumber = 3;
+        audio.playCountdownTick(false);
+      } else {
+        state.roundCountdownFrames = 0;
+        balls = [createBall(direction)];
+      }
+    }
+
+    function spawnArenaPowerup() {
+      const types = [
+        { id: 'multiball', label: 'M', name: 'MULTI-BALL!', color: '#fcee09' },
+        { id: 'mega',      label: 'G', name: 'MEGA PADDLE!', color: '#00ff66' },
+        { id: 'overdrive', label: 'S', name: 'OVERDRIVE SPEED!', color: '#c084fc' }
+      ];
+      const chosen = types[Math.floor(Math.random() * types.length)];
+      powerups.push({
+        x: VIRTUAL_W * 0.35 + Math.random() * (VIRTUAL_W * 0.3),
+        y: 110 + Math.random() * (VIRTUAL_H - 220),
+        r: 22,
+        ...chosen,
+        pulse: 0
+      });
+    }
+
+    function activatePowerup(orb, ball) {
+      audio.playPowerup();
+      spawnParticles(orb.x, orb.y, orb.color, 32, 1.4);
+      spawnFloatingText(orb.x, orb.y, orb.name, orb.color);
+      triggerShake(7, 10);
+
+      if (orb.id === 'multiball') {
+        const dir = ball.vx >= 0 ? 1 : -1;
+        const b1 = createBall(dir, ball.y, 1.05);
+        const b2 = createBall(dir, ball.y, 1.05);
+        b1.x = ball.x;
+        b2.x = ball.x;
+        b1.vy = -Math.abs(ball.vy) - 3.5;
+        b2.vy = Math.abs(ball.vy) + 3.5;
+        balls.push(b1, b2);
+      } else if (orb.id === 'mega') {
+        const targetPaddle = ball.lastHitBy === 1 ? p1 : p2;
+        targetPaddle.megaTimer = 480; // 8 seconds at 60fps
+        updateHUD();
+      } else if (orb.id === 'overdrive') {
+        ball.speed = Math.min(ball.speed * 1.32, 23);
+        const currentAngle = Math.atan2(ball.vy, ball.vx);
+        ball.vx = Math.cos(currentAngle) * ball.speed;
+        ball.vy = Math.sin(currentAngle) * ball.speed;
+        ball.color = '#fcee09';
+      }
+    }
+
+    // ==========================================
+    // INPUT HANDLING (Mouse, Touch, Keyboard)
+    // ==========================================
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (e.code === 'KeyP') {
+        togglePause();
+      } else if (e.code === 'KeyM') {
+        toggleSound();
+      } else if (e.code === 'Escape') {
+        openMenu();
+      } else if (e.code === 'Space' && (!state.running || state.gameOver)) {
+        e.preventDefault();
+        startGame();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // Mouse moves Player 1 seamlessly
+    canvas.addEventListener('mousemove', (e) => {
+      if (!state.running || state.paused) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleY = VIRTUAL_H / rect.height;
+      const mouseY = (e.clientY - rect.top) * scaleY;
+      const prevY = p1.y;
+      p1.y = Math.max(12, Math.min(VIRTUAL_H - 12 - p1.h, mouseY - p1.h / 2));
+      p1.vy = (p1.y - prevY) * 0.45;
+    });
+
+    // Multi-touch support for 1P and 2P Local
+    function handleTouches(e) {
+      if (!state.running || state.paused) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = VIRTUAL_W / rect.width;
+      const scaleY = VIRTUAL_H / rect.height;
+
+      for (let i = 0; i < e.touches.length; i++) {
+        const t = e.touches[i];
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+
+        if (tx < VIRTUAL_W / 2 || state.mode === 'ai') {
+          const prevY = p1.y;
+          p1.y = Math.max(12, Math.min(VIRTUAL_H - 12 - p1.h, ty - p1.h / 2));
+          p1.vy = (p1.y - prevY) * 0.45;
+        } else if (state.mode === '2p' && tx >= VIRTUAL_W / 2) {
+          const prevY = p2.y;
+          p2.y = Math.max(12, Math.min(VIRTUAL_H - 12 - p2.h, ty - p2.h / 2));
+          p2.vy = (p2.y - prevY) * 0.45;
+        }
+      }
+    }
+
+    canvas.addEventListener('touchstart', handleTouches, { passive: false });
+    canvas.addEventListener('touchmove', handleTouches, { passive: false });
+
+    // ==========================================
+    // UI & HUD UPDATES
+    // ==========================================
+    const rallyCounter = document.getElementById('rallyCounter');
+    const speedCounter = document.getElementById('speedCounter');
+    const p1PowerBadge = document.getElementById('p1PowerBadge');
+    const p2PowerBadge = document.getElementById('p2PowerBadge');
+    const p2NameLabel = document.getElementById('p2NameLabel');
+    const p2ControlHint = document.getElementById('p2ControlHint');
+    const overlayModal = document.getElementById('overlayModal');
+    const winnerBanner = document.getElementById('winnerBanner');
+    const winnerText = document.getElementById('winnerText');
+    const finalScoreText = document.getElementById('finalScoreText');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const soundBtn = document.getElementById('soundBtn');
+    const menuBtn = document.getElementById('menuBtn');
+    const powerupToggleBtn = document.getElementById('powerupToggleBtn');
+    const difficultySection = document.getElementById('difficultySection');
+
+    function updateHUD() {
+      rallyCounter.textContent = state.rally;
+      speedCounter.textContent = `${state.maxSpeedPct}%`;
+
+      if (p1.serveShield) {
+        p1PowerBadge.textContent = 'SERVE SHIELD';
+        p1PowerBadge.classList.remove('hidden');
+      } else if (p1.megaTimer > 0) {
+        p1PowerBadge.textContent = 'MEGA PADDLE';
+        p1PowerBadge.classList.remove('hidden');
+      } else {
+        p1PowerBadge.classList.add('hidden');
+      }
+
+      if (p2.serveShield) {
+        p2PowerBadge.textContent = 'SERVE SHIELD';
+        p2PowerBadge.classList.remove('hidden');
+      } else if (p2.megaTimer > 0) {
+        p2PowerBadge.textContent = 'MEGA PADDLE';
+        p2PowerBadge.classList.remove('hidden');
+      } else {
+        p2PowerBadge.classList.add('hidden');
+      }
+
+      if (state.mode === 'ai') {
+        p2NameLabel.textContent = `AI Core // ${state.difficulty.toUpperCase()}`;
+        p2ControlHint.textContent = 'NEURAL AUTO-PILOT';
+      } else {
+        p2NameLabel.textContent = 'Player 02 // Pink';
+        p2ControlHint.textContent = 'ARROWS / TOUCH';
+      }
+    }
+
+    // Mode Buttons
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.mode = btn.dataset.mode;
+        difficultySection.style.display = state.mode === 'ai' ? 'block' : 'none';
+        updateHUD();
+      });
+    });
+
+    // Difficulty Buttons
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.difficulty = btn.dataset.diff;
+        updateHUD();
+      });
+    });
+
+    // Powerup Toggle
+    powerupToggleBtn.addEventListener('click', () => {
+      state.powerupsEnabled = !state.powerupsEnabled;
+      if (state.powerupsEnabled) {
+        powerupToggleBtn.textContent = 'ON';
+        powerupToggleBtn.className = 'px-4 py-1.5 rounded-lg font-cyber text-xs border border-emerald-400 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]';
+      } else {
+        powerupToggleBtn.textContent = 'OFF';
+        powerupToggleBtn.className = 'px-4 py-1.5 rounded-lg font-cyber text-xs border border-slate-600 bg-slate-800/60 text-slate-400';
+        powerups = [];
+      }
+    });
+
+    function startGame() {
+      audio.init();
+      p1.score = 0;
+      p2.score = 0;
+      p1.megaTimer = 0;
+      p2.megaTimer = 0;
+      p1.serveShield = false;
+      p2.serveShield = false;
+      p1.h = BASE_PADDLE_HEIGHT;
+      p2.h = BASE_PADDLE_HEIGHT;
+      p1.y = VIRTUAL_H / 2 - p1.h / 2;
+      p2.y = VIRTUAL_H / 2 - p2.h / 2;
+      powerups = [];
+      particles = [];
+      floatingTexts = [];
+      state.running = true;
+      state.paused = false;
+      state.gameOver = false;
+      winnerBanner.classList.add('hidden');
+      overlayModal.classList.add('opacity-0', 'pointer-events-none');
+      resetRound(Math.random() > 0.5 ? 1 : -1, false);
+      updateHUD();
+    }
+
+    function togglePause() {
+      if (!state.running || state.gameOver) return;
+      state.paused = !state.paused;
+      pauseBtn.textContent = state.paused ? 'RESUME [P]' : 'PAUSE [P]';
+    }
+
+    function toggleSound() {
+      audio.enabled = !audio.enabled;
+      soundBtn.textContent = audio.enabled ? 'SFX: ON [M]' : 'SFX: OFF [M]';
+    }
+
+    function openMenu() {
+      state.paused = true;
+      modalSubtitle.textContent = 'SYSTEM PAUSED';
+      modalTitle.textContent = 'CYBERPONG';
+      startBtn.textContent = 'RESTART MATCH [SPACE]';
+      overlayModal.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function endMatch(winnerPlayer) {
+      state.gameOver = true;
+      state.running = false;
+      winnerBanner.classList.remove('hidden');
+      if (winnerPlayer === 1) {
+        winnerText.textContent = 'PLAYER 1 VICTORY!';
+        winnerText.className = 'font-cyber text-2xl font-black text-cyan-300 text-glow-cyan';
+      } else {
+        winnerText.textContent = state.mode === 'ai' ? 'AI CORE DOMINATES!' : 'PLAYER 2 VICTORY!';
+        winnerText.className = 'font-cyber text-2xl font-black text-pink-400 text-glow-pink';
+      }
+      finalScoreText.textContent = `FINAL SCORE: ${p1.score} — ${p2.score}`;
+      modalSubtitle.textContent = 'MATCH COMPLETE';
+      modalTitle.textContent = 'GAME OVER';
+      startBtn.textContent = 'PLAY AGAIN [SPACE]';
+      overlayModal.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    startBtn.addEventListener('click', startGame);
+    pauseBtn.addEventListener('click', togglePause);
+    soundBtn.addEventListener('click', toggleSound);
+    menuBtn.addEventListener('click', openMenu);
+
+    // ==========================================
+    // PHYSICS & AI UPDATE LOOP
+    // ==========================================
+    function updatePaddles() {
+      // Smooth Mega Paddle or Serve Shield resizing
+      [p1, p2].forEach(p => {
+        if (p.megaTimer > 0) {
+          p.megaTimer--;
+          if (p.megaTimer === 0) updateHUD();
+        }
+        p.targetH = p.serveShield ? SERVE_SHIELD_HEIGHT : (p.megaTimer > 0 ? 185 : BASE_PADDLE_HEIGHT);
+        p.h += (p.targetH - p.h) * 0.22;
+        if (p.hitFlash > 0) p.hitFlash -= 0.08;
+      });
+
+      const kbSpeed = 10.5;
+      // Player 1 Keyboard Controls (W/S or Up/Down in 1P mode)
+      if (keys['KeyW'] || (state.mode === 'ai' && keys['ArrowUp'])) {
+        p1.y -= kbSpeed;
+        p1.vy = -kbSpeed;
+      } else if (keys['KeyS'] || (state.mode === 'ai' && keys['ArrowDown'])) {
+        p1.y += kbSpeed;
+        p1.vy = kbSpeed;
+      } else {
+        p1.vy *= 0.82;
+      }
+
+      // Player 2 Controls
+      if (state.mode === '2p') {
+        if (keys['ArrowUp']) {
+          p2.y -= kbSpeed;
+          p2.vy = -kbSpeed;
+        } else if (keys['ArrowDown']) {
+          p2.y += kbSpeed;
+          p2.vy = kbSpeed;
+        } else {
+          p2.vy *= 0.82;
+        }
+      } else {
+        // AI Logic
+        const preset = DIFFICULTY_PRESETS[state.difficulty];
+        // Find the most threatening ball heading right
+        let threatBall = null;
+        let minTime = Infinity;
+
+        for (const b of balls) {
+          if (b.vx > 0 && b.x >= preset.reactX) {
+            const dist = p2.x - b.x;
+            const t = dist / b.vx;
+            if (t > 0 && t < minTime) {
+              minTime = t;
+              threatBall = b;
+            }
+          }
+        }
+
+        let targetCenterY = VIRTUAL_H / 2;
+        if (threatBall) {
+          if (state.difficulty === 'easy') {
+            // Easy mode: simple direct tracking without bounce prediction + larger error
+            targetCenterY = threatBall.y + p2.aiOffset;
+          } else {
+            // Medium & Hard: linear prediction with wall reflection
+            let predictedY = threatBall.y + threatBall.vy * minTime;
+            while (predictedY < 0 || predictedY > VIRTUAL_H) {
+              if (predictedY < 0) predictedY = -predictedY;
+              if (predictedY > VIRTUAL_H) predictedY = 2 * VIRTUAL_H - predictedY;
+            }
+            targetCenterY = predictedY + p2.aiOffset;
+            // Clamp AI defense primarily around the 40% center goal area so it guards the goal mouth
+            const guardMargin = p2.h * 0.35;
+            targetCenterY = Math.max(GOAL_TOP - guardMargin, Math.min(GOAL_BOTTOM + guardMargin, targetCenterY));
+          }
+        }
+
+        const currentCenter = p2.y + p2.h / 2;
+        const diff = targetCenterY - currentCenter;
+        const desiredVy = Math.max(-preset.speed, Math.min(preset.speed, diff * preset.accel));
+        p2.vy += (desiredVy - p2.vy) * 0.35;
+        p2.y += p2.vy;
+      }
+
+      // Clamp paddles inside arena
+      p1.y = Math.max(12, Math.min(VIRTUAL_H - 12 - p1.h, p1.y));
+      p2.y = Math.max(12, Math.min(VIRTUAL_H - 12 - p2.h, p2.y));
+    }
+
+    function checkPaddleCollision(b, paddle, isLeft) {
+      const paddleRight = paddle.x + paddle.w;
+      const paddleBottom = paddle.y + paddle.h;
+
+      if (
+        b.x + b.r > paddle.x &&
+        b.x - b.r < paddleRight &&
+        b.y + b.r > paddle.y &&
+        b.y - b.r < paddleBottom
+      ) {
+        // Ensure ball is moving toward this paddle
+        if ((isLeft && b.vx < 0) || (!isLeft && b.vx > 0)) {
+          const hitHeight = paddle.h;
+          const intersectY = (b.y - (paddle.y + hitHeight / 2)) / (hitHeight / 2);
+          const clampedIntersect = Math.max(-1, Math.min(1, intersectY));
+          const maxBounceAngle = Math.PI / 3; // 60 deg
+          const bounceAngle = clampedIntersect * maxBounceAngle;
+
+          // First ball touch releases any active Serve Shield
+          releaseServeShield('SHIELD RELEASED!');
+
+          // Increase speed each hit
+          b.speed = Math.min(b.speed * 1.048 + 0.25, 22.5);
+          const dir = isLeft ? 1 : -1;
+
+          b.vx = Math.cos(bounceAngle) * b.speed * dir;
+          b.vy = Math.sin(bounceAngle) * b.speed + paddle.vy * 0.28;
+          b.color = paddle.color;
+          b.lastHitBy = isLeft ? 1 : 2;
+
+          // Push ball outside paddle to prevent multi-frame sticking
+          b.x = isLeft ? paddleRight + b.r : paddle.x - b.r;
+
+          paddle.hitFlash = 1;
+          state.rally++;
+          const speedPct = Math.round((b.speed / 9.2) * 100);
+          state.maxSpeedPct = Math.max(state.maxSpeedPct, speedPct);
+
+          // Randomize AI offset for next shot
+          const preset = DIFFICULTY_PRESETS[state.difficulty];
+          p2.aiOffset = (Math.random() * 2 - 1) * preset.reactionError;
+
+          audio.playPaddleHit(b.speed / 9.2);
+          spawnParticles(b.x, b.y, paddle.color, 16, b.speed / 9.2);
+          if (b.speed > 14) triggerShake(4, 6);
+          updateHUD();
+        }
+      }
+    }
+
+    function updateBalls() {
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const b = balls[i];
+
+        // Save trail
+        b.trail.push({ x: b.x, y: b.y, color: b.color });
+        if (b.trail.length > 14) b.trail.shift();
+
+        b.x += b.vx;
+        b.y += b.vy;
+
+        // Top & Bottom Wall Bounce
+        if (b.y - b.r < 10) {
+          b.y = 10 + b.r;
+          b.vy *= -1;
+          releaseServeShield();
+          audio.playWallHit();
+          spawnParticles(b.x, b.y, '#94a3b8', 8, 0.7);
+        } else if (b.y + b.r > VIRTUAL_H - 10) {
+          b.y = VIRTUAL_H - 10 - b.r;
+          b.vy *= -1;
+          releaseServeShield();
+          audio.playWallHit();
+          spawnParticles(b.x, b.y, '#94a3b8', 8, 0.7);
+        }
+
+        // Paddle Collisions
+        checkPaddleCollision(b, p1, true);
+        checkPaddleCollision(b, p2, false);
+
+        // Powerup Orb Collisions
+        for (let j = powerups.length - 1; j >= 0; j--) {
+          const orb = powerups[j];
+          const dx = b.x - orb.x;
+          const dy = b.y - orb.y;
+          if (Math.hypot(dx, dy) < b.r + orb.r) {
+            activatePowerup(orb, b);
+            powerups.splice(j, 1);
+          }
+        }
+
+        // Goal Post Corner Deflections (4 posts at x=12 and x=VIRTUAL_W-12, y=GOAL_TOP and y=GOAL_BOTTOM)
+        const posts = [
+          { x: 12, y: GOAL_TOP },
+          { x: 12, y: GOAL_BOTTOM },
+          { x: VIRTUAL_W - 12, y: GOAL_TOP },
+          { x: VIRTUAL_W - 12, y: GOAL_BOTTOM }
+        ];
+        for (const post of posts) {
+          const dx = b.x - post.x;
+          const dy = b.y - post.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < b.r + GOAL_POST_RADIUS && dist > 0) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            b.x = post.x + nx * (b.r + GOAL_POST_RADIUS + 1);
+            b.y = post.y + ny * (b.r + GOAL_POST_RADIUS + 1);
+            const dot = b.vx * nx + b.vy * ny;
+            if (dot < 0) {
+              b.vx -= 2 * dot * nx;
+              b.vy -= 2 * dot * ny;
+              releaseServeShield();
+              audio.playWallHit();
+              spawnParticles(post.x, post.y, '#fcee09', 14, 1.1);
+            }
+          }
+        }
+
+        // Left Wall vs Left Center 40% Goal Check
+        if (b.x - b.r < 12 && (b.y < GOAL_TOP || b.y > GOAL_BOTTOM)) {
+          b.x = 12 + b.r;
+          b.vx = Math.abs(b.vx);
+          releaseServeShield();
+          audio.playWallHit();
+          spawnParticles(b.x, b.y, '#00f3ff', 10, 0.85);
+        }
+
+        // Right Wall vs Right Center 40% Goal Check
+        if (b.x + b.r > VIRTUAL_W - 12 && (b.y < GOAL_TOP || b.y > GOAL_BOTTOM)) {
+          b.x = VIRTUAL_W - 12 - b.r;
+          b.vx = -Math.abs(b.vx);
+          releaseServeShield();
+          audio.playWallHit();
+          spawnParticles(b.x, b.y, '#ff007f', 10, 0.85);
+        }
+
+        // Scoring Check (Only when ball exits through the center 40% goal mouth)
+        if (b.x + b.r < 0) {
+          // Player 2 Scores
+          balls.splice(i, 1);
+          if (balls.length === 0) {
+            p2.score++;
+            audio.playScore(false);
+            state.goalFlash = 1;
+            state.goalFlashColor = '#ff007f';
+            triggerShake(14, 18);
+            spawnParticles(30, b.y, '#ff007f', 45, 1.8);
+            if (p2.score >= WIN_SCORE) {
+              endMatch(2);
+            } else {
+              resetRound(-1, true);
+            }
+          }
+        } else if (b.x - b.r > VIRTUAL_W) {
+          // Player 1 Scores
+          balls.splice(i, 1);
+          if (balls.length === 0) {
+            p1.score++;
+            audio.playScore(true);
+            state.goalFlash = 1;
+            state.goalFlashColor = '#00f3ff';
+            triggerShake(14, 18);
+            spawnParticles(VIRTUAL_W - 30, b.y, '#00f3ff', 45, 1.8);
+            if (p1.score >= WIN_SCORE) {
+              endMatch(1);
+            } else {
+              resetRound(1, true);
+            }
+          }
+        }
+      }
+    }
+
+    function updateEffects() {
+      // Spawn Powerups periodically
+      if (state.powerupsEnabled && state.roundCountdownFrames === 0) {
+        state.powerupSpawnTimer--;
+        if (state.powerupSpawnTimer <= 0 && powerups.length < 2) {
+          spawnArenaPowerup();
+          state.powerupSpawnTimer = 420 + Math.floor(Math.random() * 240);
+        }
+      }
+
+      for (const orb of powerups) {
+        orb.pulse += 0.08;
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.vx *= 0.96;
+        pt.vy *= 0.96;
+        pt.life -= pt.decay;
+        if (pt.life <= 0) particles.splice(i, 1);
+      }
+
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y -= 1.2;
+        ft.life -= 0.02;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+      }
+
+      if (state.shakeTime > 0) {
+        state.shakeTime--;
+        if (state.shakeTime === 0) state.shakeMagnitude = 0;
+      }
+
+      if (state.goalFlash > 0) {
+        state.goalFlash -= 0.04;
+      }
+    }
+
+    // ==========================================
+    // RENDERING PIPELINE
+    // ==========================================
+    function drawArenaBackground() {
+      ctx.fillStyle = '#060814';
+      ctx.fillRect(0, 0, VIRTUAL_W, VIRTUAL_H);
+
+      // Perspective Cyber Grid
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.06)';
+      ctx.lineWidth = 1;
+      const gridSize = 50;
+      for (let x = 0; x <= VIRTUAL_W; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, VIRTUAL_H);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= VIRTUAL_H; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(VIRTUAL_W, y);
+        ctx.stroke();
+      }
+
+      // Goal Flash Effect
+      if (state.goalFlash > 0) {
+        ctx.save();
+        ctx.globalAlpha = state.goalFlash * 0.28;
+        ctx.fillStyle = state.goalFlashColor;
+        ctx.fillRect(0, 0, VIRTUAL_W, VIRTUAL_H);
+        ctx.restore();
+      }
+
+      // Center Net & Cyber Ring
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.22)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([14, 14]);
+      ctx.beginPath();
+      ctx.moveTo(VIRTUAL_W / 2, 20);
+      ctx.lineTo(VIRTUAL_W / 2, VIRTUAL_H - 20);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.arc(VIRTUAL_W / 2, VIRTUAL_H / 2, 85, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 0, 127, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+
+      // Top & Bottom Neon Borders
+      ctx.save();
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#00f3ff';
+      ctx.strokeStyle = '#00f3ff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(10, 8);
+      ctx.lineTo(VIRTUAL_W - 10, 8);
+      ctx.stroke();
+
+      ctx.shadowColor = '#ff007f';
+      ctx.strokeStyle = '#ff007f';
+      ctx.beginPath();
+      ctx.moveTo(10, VIRTUAL_H - 8);
+      ctx.lineTo(VIRTUAL_W - 10, VIRTUAL_H - 8);
+      ctx.stroke();
+      ctx.restore();
+
+      // Side Wall Barriers & Center 40% Goal Mouths
+      ctx.save();
+      ctx.lineWidth = 6;
+
+      // Left Side Walls (Cyan) - leaving the middle 40% open
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = '#00f3ff';
+      ctx.strokeStyle = '#00f3ff';
+      ctx.beginPath();
+      ctx.moveTo(10, 8);
+      ctx.lineTo(10, GOAL_TOP);
+      ctx.moveTo(10, GOAL_BOTTOM);
+      ctx.lineTo(10, VIRTUAL_H - 8);
+      ctx.stroke();
+
+      // Right Side Walls (Pink) - leaving the middle 40% open
+      ctx.shadowColor = '#ff007f';
+      ctx.strokeStyle = '#ff007f';
+      ctx.beginPath();
+      ctx.moveTo(VIRTUAL_W - 10, 8);
+      ctx.lineTo(VIRTUAL_W - 10, GOAL_TOP);
+      ctx.moveTo(VIRTUAL_W - 10, GOAL_BOTTOM);
+      ctx.lineTo(VIRTUAL_W - 10, VIRTUAL_H - 8);
+      ctx.stroke();
+
+      // Glowing Goal Netting & Laser Line inside the 40% Goal Space
+      const leftGrad = ctx.createLinearGradient(0, 0, 28, 0);
+      leftGrad.addColorStop(0, 'rgba(0, 243, 255, 0.32)');
+      leftGrad.addColorStop(1, 'rgba(0, 243, 255, 0)');
+      ctx.fillStyle = leftGrad;
+      ctx.fillRect(0, GOAL_TOP, 28, GOAL_HEIGHT);
+
+      const rightGrad = ctx.createLinearGradient(VIRTUAL_W, 0, VIRTUAL_W - 28, 0);
+      rightGrad.addColorStop(0, 'rgba(255, 0, 127, 0.32)');
+      rightGrad.addColorStop(1, 'rgba(255, 0, 127, 0)');
+      ctx.fillStyle = rightGrad;
+      ctx.fillRect(VIRTUAL_W - 28, GOAL_TOP, 28, GOAL_HEIGHT);
+
+      // Dashed Goal Line Indicators
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 8]);
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(4, GOAL_TOP);
+      ctx.lineTo(4, GOAL_BOTTOM);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255, 0, 127, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(VIRTUAL_W - 4, GOAL_TOP);
+      ctx.lineTo(VIRTUAL_W - 4, GOAL_BOTTOM);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 4 Glowing Goal Posts
+      const posts = [
+        { x: 12, y: GOAL_TOP, color: '#fcee09' },
+        { x: 12, y: GOAL_BOTTOM, color: '#fcee09' },
+        { x: VIRTUAL_W - 12, y: GOAL_TOP, color: '#fcee09' },
+        { x: VIRTUAL_W - 12, y: GOAL_BOTTOM, color: '#fcee09' }
+      ];
+      for (const post of posts) {
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = post.color;
+        ctx.fillStyle = post.color;
+        ctx.beginPath();
+        ctx.arc(post.x, post.y, GOAL_POST_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(post.x, post.y, GOAL_POST_RADIUS * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Giant Background Scores
+      ctx.save();
+      ctx.font = '900 170px Orbitron, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = 'rgba(0, 243, 255, 0.08)';
+      ctx.fillText(p1.score, VIRTUAL_W * 0.25, VIRTUAL_H / 2);
+
+      ctx.fillStyle = 'rgba(255, 0, 127, 0.08)';
+      ctx.fillText(p2.score, VIRTUAL_W * 0.75, VIRTUAL_H / 2);
+      ctx.restore();
+    }
+
+    function drawPaddle(p) {
+      ctx.save();
+      const glowColor = p.hitFlash > 0 ? '#ffffff' : (p.serveShield ? '#fcee09' : (p.megaTimer > 0 ? '#00ff66' : p.color));
+      ctx.shadowBlur = p.serveShield ? 32 : 24;
+      ctx.shadowColor = glowColor;
+      ctx.fillStyle = glowColor;
+
+      // Rounded Cyber Paddle
+      const r = 8;
+      ctx.beginPath();
+      ctx.roundRect(p.x, p.y, p.w, p.h, r);
+      ctx.fill();
+
+      // Inner core highlight
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.roundRect(p.x + 4, p.y + 8, p.w - 8, p.h - 16, 4);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBalls() {
+      for (const b of balls) {
+        // Motion Trail
+        for (let i = 0; i < b.trail.length; i++) {
+          const t = b.trail[i];
+          const ratio = (i + 1) / b.trail.length;
+          ctx.save();
+          ctx.globalAlpha = ratio * 0.45;
+          ctx.fillStyle = t.color;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, b.r * ratio * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Main Glowing Ball
+        ctx.save();
+        ctx.shadowBlur = 22;
+        ctx.shadowColor = b.color;
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawPowerups() {
+      for (const orb of powerups) {
+        const pulseRadius = orb.r + Math.sin(orb.pulse) * 4;
+        ctx.save();
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = orb.color;
+        ctx.strokeStyle = orb.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, pulseRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(10, 14, 30, 0.85)';
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.r - 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = orb.color;
+        ctx.font = '900 18px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(orb.label, orb.x, orb.y + 1);
+        ctx.restore();
+      }
+    }
+
+    function drawParticlesAndText() {
+      for (const pt of particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, pt.life);
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = pt.color;
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
+        ctx.restore();
+      }
+
+      for (const ft of floatingTexts) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.life);
+        ctx.font = '700 20px Orbitron, sans-serif';
+        ctx.fillStyle = ft.color;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = ft.color;
+        ctx.textAlign = 'center';
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
+    }
+
+    // ==========================================
+    // MAIN GAME LOOP
+    // ==========================================
+    function gameLoop() {
+      if (state.running && !state.paused && !state.gameOver) {
+        updatePaddles();
+
+        // Handle 3-Second Post-Goal Countdown
+        if (state.roundCountdownFrames > 0) {
+          state.roundCountdownFrames--;
+          const secsLeft = Math.ceil(state.roundCountdownFrames / 60);
+          if (secsLeft > 0 && secsLeft !== state.roundCountdownNumber) {
+            state.roundCountdownNumber = secsLeft;
+            audio.playCountdownTick(false);
+          }
+          if (state.roundCountdownFrames === 0) {
+            audio.playCountdownTick(true);
+            spawnFloatingText(VIRTUAL_W / 2, VIRTUAL_H / 2 - 40, 'LAUNCH!', '#00ff66');
+            balls = [createBall(state.nextServeDir)];
+          }
+        } else {
+          updateBalls();
+        }
+
+        updateEffects();
+      }
+
+      ctx.save();
+      if (state.shakeTime > 0) {
+        const dx = (Math.random() - 0.5) * state.shakeMagnitude * 2;
+        const dy = (Math.random() - 0.5) * state.shakeMagnitude * 2;
+        ctx.translate(dx, dy);
+      }
+
+      drawArenaBackground();
+      drawPowerups();
+      drawPaddle(p1);
+      drawPaddle(p2);
+      drawBalls();
+      drawParticlesAndText();
+
+      // 3-Second Goal Countdown HUD Overlay
+      if (state.running && !state.paused && state.roundCountdownFrames > 0) {
+        const secs = Math.ceil(state.roundCountdownFrames / 60);
+        const frac = (state.roundCountdownFrames % 60) / 60;
+        const scale = 1 + frac * 0.35;
+
+        ctx.save();
+        ctx.translate(VIRTUAL_W / 2, VIRTUAL_H / 2);
+
+        // Animated progress ring
+        ctx.beginPath();
+        ctx.arc(0, 0, 74, -Math.PI / 2, -Math.PI / 2 + (state.roundCountdownFrames / 180) * Math.PI * 2);
+        ctx.strokeStyle = '#fcee09';
+        ctx.lineWidth = 5;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#fcee09';
+        ctx.stroke();
+
+        ctx.font = '700 18px Orbitron, sans-serif';
+        ctx.fillStyle = '#00f3ff';
+        ctx.textAlign = 'center';
+        ctx.fillText('NEXT ROUND IN', 0, -95);
+
+        ctx.scale(scale, scale);
+        ctx.font = '900 84px Orbitron, sans-serif';
+        ctx.fillStyle = '#fcee09';
+        ctx.shadowBlur = 28;
+        ctx.shadowColor = '#fcee09';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(secs, 0, 4);
+        ctx.restore();
+      }
+
+      if (state.paused && state.running && !state.gameOver) {
+        ctx.fillStyle = 'rgba(5, 6, 17, 0.55)';
+        ctx.fillRect(0, 0, VIRTUAL_W, VIRTUAL_H);
+        ctx.font = '900 48px Orbitron, sans-serif';
+        ctx.fillStyle = '#fcee09';
+        ctx.textAlign = 'center';
+        ctx.fillText('SYSTEM PAUSED', VIRTUAL_W / 2, VIRTUAL_H / 2);
+      }
+
+      ctx.restore();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Start animation loop
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
